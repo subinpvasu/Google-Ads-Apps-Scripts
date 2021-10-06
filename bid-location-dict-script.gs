@@ -10,7 +10,7 @@ function main() {
     'payload' : JSON.stringify(data)
           };
 
-    var response = UrlFetchApp.fetch("https://72oj4k5xhc.execute-api.us-east-1.amazonaws.com/dev/token", options);
+    var response = UrlFetchApp.fetch("URL", options);
     var obj = JSON.parse(response);  
 
     var Campoptions = {
@@ -21,7 +21,7 @@ function main() {
     'muteHttpExceptions': true
         };
   
-    var campresponse = UrlFetchApp.fetch("https://ktryyavzm1.execute-api.us-east-1.amazonaws.com/dev/campaigns/googlemodifers",Campoptions);
+    var campresponse = UrlFetchApp.fetch("URL",Campoptions);
     var cmp = JSON.parse(campresponse);  
     var campaignid;
   

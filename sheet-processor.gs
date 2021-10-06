@@ -1,6 +1,6 @@
 function main()
 {
-  var ssId = '1E38W1JGBG0EpWlOLOsns9Guny_6bM9NpzmUHH492_Eo'
+  var ssId = 'ID'
   SpreadsheetApp.openById(ssId)
   var ss = SpreadsheetApp.openById(ssId)
 

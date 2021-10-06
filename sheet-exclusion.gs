@@ -2,7 +2,7 @@
 
 function main() {
   //PROVIDE THE SHEET URL FROM ADDRESS BAR
-  var spreadsheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/13jwArBHt_Oll6E2UNOSZg6BOgL_HNrtdRTndjG54AQ4/edit#gid=1734635281');  
+  var spreadsheet = SpreadsheetApp.openByUrl('URL');  
   var sheet = spreadsheet.getSheetByName('Automatic placements report');//REPLACE SHEET NAME
   var data = sheet.getSheetValues(4, 1, -1, -1);  
   var urls_impr = [];

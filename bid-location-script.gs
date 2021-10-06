@@ -1,6 +1,6 @@
 function main() {
   //PROVIDE THE SHEET URL FROM ADDRESS BAR
-  var spreadsheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1hz7cAv2n8qOND66erOXI30EPlMPLQd0U3CzTsz5U-Zw/edit');  
+  var spreadsheet = SpreadsheetApp.openByUrl('URL');  
   var sheet = spreadsheet.getSheetByName('Sheet2');//REPLACE SHEET NAME
   var data = sheet.getSheetValues(2, 1, -1, -1);  
   var begin = 2;
