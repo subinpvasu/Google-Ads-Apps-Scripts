@@ -1,0 +1,628 @@
+var setup_sheet_id = '1sKrt4VkVFGgKf9w9sKX7rzhlqYD8cRjdQG6G92W_HmU';
+var timeZone = AdsApp.currentAccount().getTimeZone();
+var spreadsheet = SpreadsheetApp.create("Report output");
+var MULTIPLIER = 1000000;
+
+
+var unlabelled_keywords = [];
+var labelled_campaigns = [];
+var unlabelled_adgroups = [];
+
+
+function main()
+{
+   get_conditions();
+  
+  /* 
+   var spreadsheet = SpreadsheetApp.create("Report output");
+   var report = AdsApp.report("SELECT Criteria, Clicks, CostPerConversion, Conversions, Date,Id FROM   AUDIENCE_PERFORMANCE_REPORT WHERE  Clicks<5 AND CostPerConversion<5000000 DURING 20211001,20211031");
+   report.exportToSheet(spreadsheet.getActiveSheet());
+   Logger.log("Report available at " + spreadsheet.getUrl()); 
+  
+ /*
+  var query = 'SELECT campaign.name, campaign.start_date, metrics.clicks,metrics.cost_per_conversion FROM campaign  ';
+  var result = AdsApp.search(query, {apiVersion: 'v8'});
+  
+  while (result.hasNext()) {
+    var row = result.next();
+    Logger.log(row);
+  }*/
+/*
+  var campaignIterator = AdsApp.keywords().withCondition(condition)
+      //.withCondition("CostPerConversion > 10")
+      .get();
+  if (campaignIterator.hasNext()) {
+    var campaign = campaignIterator.next();
+    // You can also request reports for pre-defined date ranges. See
+    // https://developers.google.com/google-ads/scripts/docs/reference/adsapp/adsapp_campaign#getStatsFor_1,
+    // DateRangeLiteral section for possible values.
+    var stats = campaign.getStatsFor('LAST_MONTH');
+    Logger.log(campaign.getName() + ', ' + stats.getClicks() + 'clicks, ' +
+        stats.getCostPerConversion() + ' impressions');
+  }
+
+/*
+  var rows = AdsApp.search(
+     'SELECT campaign.name, campaign.start_date, metrics.clicks,metrics.cost_per_conversion ' +
+     'FROM   campaign ' +
+     'WHERE  metrics.cost_per_conversion < 10');
+
+ while (rows.hasNext()) {
+   var row = rows.next();
+   Logger.log(row);
+ }
+  */
+}
+
+
+function get_conditions()
+{    
+  const setup = SpreadsheetApp.openById(setup_sheet_id);
+  
+  const email_address = setup.getRangeByName('email_address').getValue();
+  const review_duration = setup.getRangeByName('review_duration').getValue();
+  const threshold_click = setup.getRangeByName('threshold_click').getValue();
+  const threshold_coscon = setup.getRangeByName('threshold_coscon').getValue()*MULTIPLIER;
+  
+  const status_campaign = setup.getRangeByName('status_campaign').getValue();
+  const status_adgroup = setup.getRangeByName('status_adgroup').getValue();
+  const status_keywords = setup.getRangeByName('status_keywords').getValue();
+  const status_search_terms = setup.getRangeByName('status_search_terms').getValue();
+  const status_country = setup.getRangeByName('status_country').getValue();
+  const status_region = setup.getRangeByName('status_region').getValue();
+  const status_city = setup.getRangeByName('status_city').getValue();
+  const status_devices = setup.getRangeByName('status_devices').getValue();
+  const status_match_type = setup.getRangeByName('status_match_type').getValue();
+  const status_weekday = setup.getRangeByName('status_weekday').getValue();
+  const status_hours = setup.getRangeByName('status_hours').getValue();
+  const status_gender = setup.getRangeByName('status_gender').getValue();
+  const status_age = setup.getRangeByName('status_age').getValue();
+  const status_audience = setup.getRangeByName('status_audience').getValue();
+  
+  const label_campaign = setup.getRangeByName('label_campaign').getValue();
+  const paused_campaign = setup.getRangeByName('paused_campaign').getValue();
+  const label_adgroup = setup.getRangeByName('label_adgroup').getValue();
+  const paused_adgroup = setup.getRangeByName('paused_adgroup').getValue();
+  const label_keyword = setup.getRangeByName('label_keyword').getValue();
+  const paused_keyword = setup.getRangeByName('paused_keyword').getValue();
+  
+  
+  if(label_campaign=='Yes'){campaigns_labelled();}  
+  if(label_adgroup=='Yes'){adgroups_labelled();}  
+  if(label_keyword=='Yes'){keywords_labelled();}
+  
+   
+  status_campaign=='Yes'?write_to_sheet(campaign_performance(threshold_click, threshold_coscon, label_campaign, paused_campaign, review_duration)):'';    
+  status_adgroup=='Yes'?write_to_sheet(adgroup_performance(threshold_click, threshold_coscon, label_adgroup, paused_adgroup, review_duration)):''; 
+  status_keywords=='Yes'?write_to_sheet(keyword_performance(threshold_click, threshold_coscon, label_keyword, paused_keyword, review_duration)):''; 
+  status_search_terms=='Yes'?write_to_sheet(search_terms_performance(threshold_click, threshold_coscon, review_duration)):'';   
+  status_devices=='Yes'?write_to_sheet(device_performance(threshold_click, threshold_coscon, review_duration)):'';   
+  status_weekday=='Yes'?write_to_sheet(dayofweek_performance(threshold_click, threshold_coscon, review_duration)):''; 
+  status_hours=='Yes'?write_to_sheet(hourofday_performance(threshold_click, threshold_coscon, review_duration)):''; 
+  status_country=='Yes'?write_to_sheet(location_performance(threshold_click, threshold_coscon, review_duration, 'Country')):''; 
+  status_region=='Yes'?write_to_sheet(location_performance(threshold_click, threshold_coscon, review_duration, 'Region')):''; 
+  status_city=='Yes'?write_to_sheet(location_performance(threshold_click, threshold_coscon, review_duration, 'City')):''; 
+  status_match_type=='Yes'?write_to_sheet(matchtype_performance(threshold_click, threshold_coscon, review_duration)):''; 
+  status_gender=='Yes'?write_to_sheet(gender_performance(threshold_click, threshold_coscon, review_duration)):''; 
+  status_age=='Yes'?write_to_sheet(agerange_performance(threshold_click, threshold_coscon, review_duration)):''; 
+  status_audience=='Yes'?write_to_sheet(audience_performance(threshold_click, threshold_coscon, review_duration)):''; 
+  
+  
+  send_email_alerts(email_address);
+  
+}
+
+function send_email_alerts(email_address) {
+
+  MailApp.sendEmail({
+    to: email_address,
+    subject: 'Wasteful Elements Alert',
+    htmlBody: "Hi, <br>" +
+              "Find the details of the wasteful elements <a href="+spreadsheet.getUrl()+">here</a>."
+  });
+  Logger.log("Email Sent!");
+}
+
+
+
+function write_to_sheet(response)
+{  
+  var sheet = spreadsheet.getSheetByName('report');
+  if(sheet == null){    
+    sheet = spreadsheet.insertSheet();
+    spreadsheet.moveActiveSheet(1);    
+    sheet.setName('report');
+    var header = ['Date Script Ran', 'Element Type',	'Wasteful Element',	'Clicks',	'Conversions',	'Cost / Conv'];
+    sheet.appendRow(header);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1,1,1,6).setFontWeight("bold");    
+  }
+ 
+  var reports = [];
+  rows = response.result;
+  for (i in rows)
+  {
+    reports[i] = [rows[i].date, rows[i].type, rows[i].element, rows[i].clicks, rows[i].conversion, rows[i].costperconversion];
+  } 
+  var lastCol = sheet.getLastColumn();
+  var lastRow = sheet.getLastRow();
+  if(reports.length>0)
+  {
+    sheet.getRange(lastRow+1,1,reports.length,6).setValues(reports);    
+  }
+  else
+  {
+    reports = [response.date, response.type, 'N/A', 'N/A', 'N/A', 'N/A'];
+    sheet.appendRow(reports);    
+  }
+  
+}
+
+function get_date_intervals(interval)
+{
+  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  var now = new Date();
+  var start = new Date(now.getTime() - parseInt(interval) * MILLIS_PER_DAY);
+  var end = new Date(now.getTime());
+  var duration =  ' DURING ' + Utilities.formatDate(start, timeZone, 'yyyyMMdd') + ',' + Utilities.formatDate(end, timeZone, 'yyyyMMdd');
+  return duration;
+}
+
+function campaigns_labelled()
+{ 
+  var campaignIterator = AdsApp.campaigns().get();  
+  while (campaignIterator.hasNext()) {
+    var campaign = campaignIterator.next();
+    if(campaign.labels().get().totalNumEntities()>0)
+    {
+      labelled_campaigns.push(campaign.getId());  
+    }
+  }
+  return labelled_campaigns;
+}
+
+
+
+function adgroups_labelled()
+{ 
+  var adgroupIterator = AdsApp.campaigns().get();  
+  while (adgroupIterator.hasNext()) {
+    var adgroup = adgroupIterator.next();
+    if(adgroup.labels().get().totalNumEntities()>0)
+    {
+      unlabelled_adgroups.push(adgroup.getId());  
+    }
+  }
+  return unlabelled_adgroups;
+}
+
+
+
+function keywords_labelled()
+{ 
+  var keywordIterator = AdsApp.keywords().get();
+  while (keywordIterator.hasNext()) {
+    var keyword = keywordIterator.next();
+    if(keyword.labels().get().totalNumEntities()>0)
+    {
+      unlabelled_keywords.push(keyword.getId());  
+    }
+  }
+  return unlabelled_keywords;
+}
+
+
+
+function campaign_performance(click, cost_conversion, labelled_campaign, paused_campaign, review_days)
+{
+    var data = {};
+    var result = {};
+    var type = 'Campaigns';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+    var xtra = '';
+    
+    if(paused_campaign=='Yes'){xtra = " AND CampaignStatus='ENABLED' "}  
+  
+    var query = "SELECT CampaignName, Clicks, CostPerConversion, Conversions, CampaignId FROM CAMPAIGN_PERFORMANCE_REPORT WHERE  Clicks<"+click+" "+xtra+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days);
+    var report = AdsApp.report(query);
+    
+    var exclude_campaigns = [];
+    if(labelled_campaign=='Yes'){exclude_campaigns = exclude_campaigns.concat(labelled_campaigns);}
+   
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+      if(exclude_campaigns.includes(row['CampaignId'])){continue;}
+      result[x] = 
+        {
+          'date' : date,
+          'type' : type,
+          'element' : row['CampaignName'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+  data.date = date;
+  data.type = type;
+  data.result = result;
+  return data;
+}
+
+function adgroup_performance(click, cost_conversion, labelled_adgroup, paused_adgroup, review_days)
+{
+    var data = {};
+    var result = {};
+    var type = 'Adgroups';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+    
+    if(paused_adgroup=='Yes'){xtra = " AND AdGroupStatus='ENABLED' "}  
+  
+    var query = "SELECT AdGroupName, Clicks, CostPerConversion, Conversions, AdGroupId FROM   ADGROUP_PERFORMANCE_REPORT WHERE  Clicks<"+click+" "+xtra+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days);
+    var report = AdsApp.report(query);
+  
+    var exclude_adgroups = [];
+    if(labelled_adgroup=='Yes'){exclude_adgroups = exclude_adgroups.concat(unlabelled_adgroups);}    
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+      if(exclude_adgroups.includes(row['AdGroupId'])){continue;}
+      result[x] = 
+        {
+          'date' : date,
+          'type' : type,
+          'element' : row['AdGroupName'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
+
+function keyword_performance(click, cost_conversion, labelled_keyword, paused_keyword, review_days)
+{
+    var data = {};
+    var result = {};
+    var type = 'Keywords';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+    
+    if(paused_keyword=='Yes'){xtra = " AND Status='ENABLED' "}  
+  
+    var query = "SELECT Criteria, Clicks, CostPerConversion, Conversions, Id FROM   KEYWORDS_PERFORMANCE_REPORT WHERE  Clicks<"+click+" "+xtra+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days);
+    var report = AdsApp.report(query);
+  
+    var exclude_keywords = [];
+    if(labelled_keyword=='Yes'){exclude_keywords = exclude_keywords.concat(unlabelled_keywords);}    
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+      if(exclude_keywords.includes(row['Id'])){continue;}
+      result[x] = 
+        {
+          'date' : date,
+          'type' : type,
+          'element' : row['Criteria'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
+
+function search_terms_performance(click, cost_conversion, review_days)
+{
+    var data = {};
+    var result = {};
+    var type = 'Search Terms';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+    
+    var query = 'SELECT Query, Clicks, CostPerConversion, Conversions FROM   SEARCH_QUERY_PERFORMANCE_REPORT WHERE  Clicks<'+click+' AND CostPerConversion<'+cost_conversion+ get_date_intervals(review_days);    
+    var report = AdsApp.report(query);
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();   
+      result[x] = 
+        {
+          'date' : date,
+          'type' : type,
+          'element' : row['Query'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
+
+function location_performance(click, cost_conversion, review_days, location_type)
+{ 
+    var data = {};
+    var result = {};
+    var type = 'Location : '+location_type;
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+    switch(location_type)
+    {
+      case 'Country':
+        var query = "SELECT CountryCriteriaId, Clicks, CostPerConversion, Conversions FROM   GEO_PERFORMANCE_REPORT WHERE  Clicks<"+click+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days);    
+        break;
+      case 'Region':
+        var query = "SELECT RegionCriteriaId, Clicks, CostPerConversion, Conversions FROM   GEO_PERFORMANCE_REPORT WHERE  Clicks<"+click+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days);
+        break;
+      case 'City':
+        var query = "SELECT CityCriteriaId, Clicks, CostPerConversion, Conversions FROM   GEO_PERFORMANCE_REPORT WHERE  Clicks<"+click+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days);
+        break;
+    }
+    
+    
+    var report = AdsApp.report(query);
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+   
+      result[x] = 
+        {
+          'date' : date,
+          'type' : type,
+          'element' : location_type=='Country'?row['CountryCriteriaId']:(location_type=='Region'?row['RegionCriteriaId']:row['CityCriteriaId']),
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
+
+function device_performance(click, cost_conversion, review_days)
+{
+    var data = {};
+    var result = {};
+    var type = 'Devices';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+  
+    var query = "SELECT Device, Clicks, CostPerConversion, Conversions, Date FROM   CAMPAIGN_PERFORMANCE_REPORT WHERE  Clicks<"+click+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days); 
+    var report = AdsApp.report(query);
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+      
+      result[x] = 
+        {
+          'date' : date,
+          'type' : row['Date']+' - '+type,
+          'element' : row['Device'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
+
+function matchtype_performance(click, cost_conversion, review_days)
+{
+    var data = {};
+    var result = {};
+    var type = 'Match Type';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+  
+    var query = "SELECT KeywordMatchType, Clicks, CostPerConversion, Conversions, Date FROM   KEYWORDS_PERFORMANCE_REPORT WHERE  Clicks<"+click+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days); 
+    var report = AdsApp.report(query);
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+      
+      result[x] = 
+        {
+          'date' : date,
+          'type' : row['Date']+' - '+type,
+          'element' : row['KeywordMatchType'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
+
+function gender_performance(click, cost_conversion, review_days)
+{
+    var data = {};
+    var result = {};
+    var type = 'Gender';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+  
+    var query = "SELECT Criteria, Clicks, CostPerConversion, Conversions, Date FROM   GENDER_PERFORMANCE_REPORT WHERE  Clicks<"+click+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days); 
+    var report = AdsApp.report(query);
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+      
+      result[x] = 
+        {
+          'date' : date,
+          'type' : row['Date']+' - '+type,
+          'element' : row['Criteria'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
+
+function agerange_performance(click, cost_conversion, review_days)
+{
+    var data = {};
+    var result = {};
+    var type = 'Age Range';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+  
+    var query = "SELECT Criteria, Clicks, CostPerConversion, Conversions, Date FROM   AGE_RANGE_PERFORMANCE_REPORT WHERE  Clicks<"+click+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days); 
+    var report = AdsApp.report(query);
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+      
+      result[x] = 
+        {
+          'date' : date,
+          'type' : row['Date']+' - '+type,
+          'element' : row['Criteria'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
+
+function audience_performance(click, cost_conversion, review_days)
+{
+    var data = {};
+    var result = {};
+    var type = 'Audience';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+  
+    var query = "SELECT Criteria, Clicks, CostPerConversion, Conversions, Date FROM   AUDIENCE_PERFORMANCE_REPORT WHERE  Clicks<"+click+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days); 
+    var report = AdsApp.report(query);
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+      
+      result[x] = 
+        {
+          'date' : date,
+          'type' : row['Date']+' - '+type,
+          'element' : row['Criteria'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
+
+function hourofday_performance(click, cost_conversion, review_days)
+{  
+    var data = {};
+    var result = {};
+    var type = 'Hour of Day';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+  
+    var query = "SELECT HourOfDay, Clicks, CostPerConversion, Conversions FROM   CAMPAIGN_PERFORMANCE_REPORT WHERE  Clicks<"+click+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days);
+    
+    var report = AdsApp.report(query);
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+   
+      result[x] = 
+        {
+          'date' : date,
+          'type' : type,
+          'element' : row['HourOfDay'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
+
+function dayofweek_performance(click, cost_conversion, review_days)
+{      
+    var data = {};
+    var result = {};
+    var type = 'Day of Week';
+    var date = Utilities.formatDate(new Date(), timeZone, 'dd/MM/yyyy');
+    var x = 0;
+  
+    var query = "SELECT DayOfWeek, Clicks, CostPerConversion, Conversions FROM   CAMPAIGN_PERFORMANCE_REPORT WHERE  Clicks<"+click+" AND CostPerConversion<"+cost_conversion+ get_date_intervals(review_days);
+    
+    var report = AdsApp.report(query);
+    
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+   
+      result[x] = 
+        {
+          'date' : date,
+          'type' : type,
+          'element' : row['DayOfWeek'],
+          'clicks' : row['Clicks'],
+          'conversion' : row['Conversions'],
+          'costperconversion' : row['CostPerConversion']
+        }
+      x++;
+    }    
+    data.date = date;
+    data.type = type;
+    data.result = result;
+  return data;
+}
