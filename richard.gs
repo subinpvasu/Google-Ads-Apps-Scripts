@@ -1,4 +1,4 @@
-var setup_sheet_id = '1sKrt4VkVFGgKf9w9sKX7rzhlqYD8cRjdQG6G92W_HmU';
+var setup_sheet_id = 'ID';
 var timeZone = AdsApp.currentAccount().getTimeZone();
 var spreadsheet = SpreadsheetApp.create("Report output");
 var MULTIPLIER = 1000000;

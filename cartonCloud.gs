@@ -1,7 +1,7 @@
 function getToken()
 {
-  var client_id = '8VX3dSFyv2nIX6Yvt7PTHJEcQ';
-  var secret_id = 'EOmr9E5AoXac1Krtskr6iyr9MAKGmuTlcvq21pdf';
+  var client_id = '';
+  var secret_id = '';
   var tokenEndpoint = "https://api.cartoncloud.com/uaa/oauth/token";
     var head = {
       'Authorization':"Basic "+ Utilities.base64Encode(client_id+':'+secret_id),
