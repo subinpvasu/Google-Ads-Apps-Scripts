@@ -8,4 +8,5 @@ Don't Worry, It's not going to let anyone steal their data, But will show my ski
 *	LinkedIn Profile : https://bit.ly/2So3Ulk
 *	Freelancer Profile : https://bit.ly/3iE6ALV
 *	Mail : subinpvasu@gmail.com
-*   Skype : subinpvasu 
+* Skype : subinpvasu 
+* WhatsApp : +91 9495546474
